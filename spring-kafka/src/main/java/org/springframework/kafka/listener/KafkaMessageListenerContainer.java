@@ -603,9 +603,6 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 					if (!this.isAnyManualAck && !this.autoCommit) {
 						this.acks.add(record);
 					}
-					if (this.isRecordAck) {
-						this.consumer.wakeup();
-					}
 				}
 				catch (Exception e) {
 					if (this.containerProperties.isAckOnError() && !this.autoCommit) {
@@ -618,9 +615,6 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 						this.logger.error("Listener threw an exception and no error handler for " + record, e);
 					}
 				}
-			}
-			if (this.isManualAck || this.isBatchAck) {
-				this.consumer.wakeup();
 			}
 		}
 
@@ -791,9 +785,6 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 							else {
 								ListenerConsumer.this.logger.debug("Interrupt ignored");
 							}
-						}
-						if (!ListenerConsumer.this.isManualImmediateAck && this.active) {
-							ListenerConsumer.this.consumer.wakeup();
 						}
 					}
 				}
