@@ -17,8 +17,8 @@
 package org.springframework.kafka.annotation;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.willAnswer;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 
@@ -159,7 +159,7 @@ public class EnableKafkaIntegrationTests {
 				.getClass().getName()).contains("EnableKafkaIntegrationTests$Config$");
 		assertThat(KafkaTestUtils.getPropertyValue(manualContainer,
 				"containerProperties.messageListener.delegate.delegate"))
-						.isInstanceOf(MessagingMessageListenerAdapter.class);
+				.isInstanceOf(MessagingMessageListenerAdapter.class);
 
 		template.send("annotated5", 0, 0, "foo");
 		template.send("annotated5", 1, 0, "bar");
@@ -379,7 +379,7 @@ public class EnableKafkaIntegrationTests {
 
 		@Bean
 		public KafkaListenerContainerFactory<ConcurrentMessageListenerContainer<Integer, String>>
-				kafkaListenerContainerFactory() {
+		kafkaListenerContainerFactory() {
 			ConcurrentKafkaListenerContainerFactory<Integer, String> factory =
 					new ConcurrentKafkaListenerContainerFactory<>();
 			factory.setConsumerFactory(consumerFactory());
@@ -428,7 +428,7 @@ public class EnableKafkaIntegrationTests {
 
 		@Bean
 		public KafkaListenerContainerFactory<ConcurrentMessageListenerContainer<Integer, String>>
-				kafkaManualAckListenerContainerFactory() {
+		kafkaManualAckListenerContainerFactory() {
 			ConcurrentKafkaListenerContainerFactory<Integer, String> factory =
 					new ConcurrentKafkaListenerContainerFactory<>();
 			factory.setConsumerFactory(manualConsumerFactory());
@@ -451,7 +451,7 @@ public class EnableKafkaIntegrationTests {
 
 		@Bean
 		public KafkaListenerContainerFactory<ConcurrentMessageListenerContainer<Integer, String>>
-				kafkaAutoStartFalseListenerContainerFactory() {
+		kafkaAutoStartFalseListenerContainerFactory() {
 			ConcurrentKafkaListenerContainerFactory<Integer, String> factory =
 					new ConcurrentKafkaListenerContainerFactory<>();
 			ContainerProperties props = factory.getContainerProperties();
@@ -465,7 +465,7 @@ public class EnableKafkaIntegrationTests {
 
 		@Bean
 		public KafkaListenerContainerFactory<ConcurrentMessageListenerContainer<Integer, String>>
-				kafkaRebalanceListenerContainerFactory() {
+		kafkaRebalanceListenerContainerFactory() {
 			ConcurrentKafkaListenerContainerFactory<Integer, String> factory =
 					new ConcurrentKafkaListenerContainerFactory<>();
 			ContainerProperties props = factory.getContainerProperties();
@@ -656,7 +656,7 @@ public class EnableKafkaIntegrationTests {
 				@TopicPartition(topic = "annotated5", partitions = { "#{'${foo:0,1}'.split(',')}" }),
 				@TopicPartition(topic = "annotated6", partitions = "0",
 						partitionOffsets = @PartitionOffset(partition = "${xxx:1}", initialOffset = "${yyy:0}",
-										relativeToCurrent = "${zzz:true}"))
+								relativeToCurrent = "${zzz:true}"))
 		})
 		public void listen5(ConsumerRecord<?, ?> record) {
 			this.record = record;
