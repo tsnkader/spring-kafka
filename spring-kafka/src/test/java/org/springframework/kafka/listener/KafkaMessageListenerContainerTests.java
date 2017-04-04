@@ -55,6 +55,7 @@ import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
+import org.mockito.ArgumentCaptor;
 
 import org.springframework.beans.DirectFieldAccessor;
 import org.springframework.context.ApplicationEvent;
@@ -912,6 +913,7 @@ public class KafkaMessageListenerContainerTests {
 		container.stop();
 	}
 
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private void testSeekGuts(Map<String, Object> props, String topic, boolean autoCommit) throws Exception {
 		logger.info("Start seek " + topic);
 		DefaultKafkaConsumerFactory<Integer, String> cf = new DefaultKafkaConsumerFactory<>(props);
@@ -932,6 +934,8 @@ public class KafkaMessageListenerContainerTests {
 				messageThread = Thread.currentThread();
 				latch.get().countDown();
 				if (latch.get().getCount() == 2 && !seekInitial.get()) {
+					callback.seekToEnd(topic, 0);
+					callback.seekToBeginning(topic, 0);
 					callback.seek(topic, 0, 1);
 					callback.seek(topic, 1, 1);
 				}
@@ -1020,13 +1024,22 @@ public class KafkaMessageListenerContainerTests {
 		assertThat(idleEventPublished.get()).isTrue();
 		assertThat(latch.get().await(60, TimeUnit.SECONDS)).isTrue();
 		container.stop();
+		ArgumentCaptor<Collection> captor = ArgumentCaptor.forClass(Collection.class);
+		verify(consumer).seekToBeginning(captor.capture());
+		TopicPartition next = ((Collection<TopicPartition>) captor.getValue()).iterator().next();
+		assertThat(next.topic()).isEqualTo(topic);
+		assertThat(next.partition()).isEqualTo(0);
+		verify(consumer).seekToEnd(captor.capture());
+		next = ((Collection<TopicPartition>) captor.getValue()).iterator().next();
+		assertThat(next.topic()).isEqualTo(topic);
+		assertThat(next.partition()).isEqualTo(0);
 		logger.info("Stop seek");
 	}
 
 	@Test
 	public void testDefinedPartitions() throws Exception {
 		this.logger.info("Start defined parts");
-		Map<String, Object> props = KafkaTestUtils.consumerProps("test3", "false", embeddedKafka);
+		Map<String, Object> props = KafkaTestUtils.consumerProps("test13", "false", embeddedKafka);
 		TopicPartitionInitialOffset topic1Partition0 = new TopicPartitionInitialOffset(topic13, 0, 0L);
 
 		CountDownLatch initialConsumersLatch = new CountDownLatch(2);
