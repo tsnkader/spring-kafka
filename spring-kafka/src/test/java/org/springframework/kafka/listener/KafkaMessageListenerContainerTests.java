@@ -1285,7 +1285,8 @@ public class KafkaMessageListenerContainerTests {
 		final CountDownLatch commitLatch = new CountDownLatch(2);
 		willAnswer(invocation -> {
 
-			Map<TopicPartition, OffsetAndMetadata> map = invocation.getArgument(0);
+			@SuppressWarnings({ "unchecked" })
+			Map<TopicPartition, OffsetAndMetadata> map = invocation.getArgumentAt(0, Map.class);
 			try {
 				return invocation.callRealMethod();
 			}
