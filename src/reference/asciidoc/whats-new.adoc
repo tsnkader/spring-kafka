@@ -2,7 +2,7 @@
 
 ==== Kafka Client
 
-This version uses the Apache Kafka 0.10.x.x client.
+This version uses the Apache Kafka 0.10.0.x or 0.10.1.x client.
 
 ==== Batch Listeners
 
