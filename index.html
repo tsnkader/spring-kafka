@@ -56,6 +56,33 @@ Spring AMQP.
 
 {% include download_widget.md %}
 
+## Kafka Client Compatibility
+
+Spring for Apache Kafka is based on the pure java kafka-clients jar.
+The following is the compatibility matrix:
+
+<table>
+  <tr>
+      <th>Spring for Apache Kafka Version</th>
+      <th><code>kafka-clients</code> Version</th>
+  </tr>
+  <tr>
+      <td>1.2.x</td>
+      <td>0.10.2.x</td>
+  </tr>
+  <tr>
+      <td>1.1.x</td>
+      <td>0.10.0.x, 0.10.1.x</td>
+  </tr>
+  <tr>
+      <td>1.0.x</td>
+      <td>0.9.x.x</td>
+  </tr>
+</table>
+
+These versions will be referenced transitively when using maven or gradle for version management.
+For the 1.1.x version, the 0.10.1.x is the default.
+
 {% endcapture %}
 
 {% capture related_resources %}
