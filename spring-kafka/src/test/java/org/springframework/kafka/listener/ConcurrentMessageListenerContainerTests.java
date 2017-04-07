@@ -21,12 +21,9 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Mockito.mock;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -76,8 +73,6 @@ public class ConcurrentMessageListenerContainerTests {
 	private static String topic1 = "testTopic1";
 
 	private static String topic2 = "testTopic2";
-
-//	private static String topic3 = "testTopic3";
 
 	private static String topic4 = "testTopic4";
 
@@ -214,10 +209,8 @@ public class ConcurrentMessageListenerContainerTests {
 		ContainerProperties containerProps = new ContainerProperties(topic2);
 
 		final CountDownLatch latch = new CountDownLatch(4);
-		final Set<String> listenerThreadNames = new ConcurrentSkipListSet<>();
 		containerProps.setMessageListener((MessageListener<Integer, String>) message -> {
 			ConcurrentMessageListenerContainerTests.this.logger.info("manual: " + message);
-			listenerThreadNames.add(Thread.currentThread().getName());
 			latch.countDown();
 		});
 
@@ -239,9 +232,6 @@ public class ConcurrentMessageListenerContainerTests {
 		template.sendDefault(2, "qux");
 		template.flush();
 		assertThat(latch.await(60, TimeUnit.SECONDS)).isTrue();
-		for (String threadName : listenerThreadNames) {
-			assertThat(threadName).contains("-L-");
-		}
 		container.stop();
 		this.logger.info("Stop manual");
 	}
@@ -536,126 +526,6 @@ public class ConcurrentMessageListenerContainerTests {
 		assertThat(consumer.position(new TopicPartition(topic9, 1))).isEqualTo(2);
 		consumer.close();
 		logger.info("Stop ack on error");
-	}
-
-	@Test
-	public void testAckOnErrorManualImmediate() throws  Exception {
-		//ackOnError should not affect manual commits
-		testAckOnErrorWithManualImmediateGuts(topic10, true);
-		testAckOnErrorWithManualImmediateGuts(topic11, false);
-	}
-
-	private void testAckOnErrorWithManualImmediateGuts(String topic, boolean ackOnError) throws Exception {
-		logger.info("Start ack on error with ManualImmediate ack mode");
-		Map<String, Object> props = KafkaTestUtils.consumerProps("testMan" + ackOnError, "false", embeddedKafka);
-		DefaultKafkaConsumerFactory<Integer, String> cf = new DefaultKafkaConsumerFactory<Integer, String>(props);
-		final CountDownLatch latch = new CountDownLatch(2);
-		ContainerProperties containerProps = new ContainerProperties(topic);
-		containerProps.setSyncCommits(true);
-		containerProps.setAckMode(AckMode.MANUAL_IMMEDIATE);
-		containerProps.setAckOnError(ackOnError);
-		containerProps.setMessageListener((AcknowledgingMessageListener<Integer, String>) (message, ack) -> {
-			ConcurrentMessageListenerContainerTests.this.logger.info("manualExisting: " + message);
-			latch.countDown();
-			if (message.value().startsWith("b")) {
-				throw new RuntimeException();
-			}
-			else {
-				ack.acknowledge();
-			}
-
-		});
-		ConcurrentMessageListenerContainer<Integer, String> container = new ConcurrentMessageListenerContainer<>(cf,
-				containerProps);
-		container.setConcurrency(1);
-		container.setBeanName("testAckOnErrorWithManualImmediate");
-		container.start();
-		ContainerTestUtils.waitForAssignment(container, embeddedKafka.getPartitionsPerTopic());
-
-		Map<String, Object> senderProps = KafkaTestUtils.producerProps(embeddedKafka);
-		ProducerFactory<Integer, String> pf = new DefaultKafkaProducerFactory<>(senderProps);
-		KafkaTemplate<Integer, String> template = new KafkaTemplate<>(pf);
-		template.setDefaultTopic(topic);
-		template.sendDefault(0, 0, "foo");
-		template.sendDefault(0, 1, "bar");
-		template.flush();
-		assertThat(latch.await(60, TimeUnit.SECONDS)).isTrue();
-		container.stop();
-
-		Consumer<Integer, String> consumer = cf.createConsumer();
-		consumer.assign(Arrays.asList(new TopicPartition(topic, 0), new TopicPartition(topic, 0)));
-
-		// only one message should be acknowledged, because second, starting with "b"
-		// will throw RunTimeException and acknowledge() method will not invoke on it
-		for (int i = 0; i < 100; i++) {
-			if (consumer.position(new TopicPartition(topic, 0)) == 1) {
-				break;
-			}
-			else {
-				Thread.sleep(100);
-			}
-		}
-		assertThat(consumer.position(new TopicPartition(topic, 0))).isEqualTo(1);
-		consumer.close();
-		logger.info("Stop ack on error with ManualImmediate ack mode");
-	}
-
-	@Test
-	public void testRebalanceWithSlowConsumer() throws Exception {
-		this.logger.info("Start auto");
-		Map<String, Object> props = KafkaTestUtils.consumerProps("test101", "false", embeddedKafka);
-		props.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, "20000");
-		DefaultKafkaConsumerFactory<Integer, String> cf = new DefaultKafkaConsumerFactory<>(props);
-		ContainerProperties containerProps = new ContainerProperties(topic1);
-		final CountDownLatch latch = new CountDownLatch(8);
-		final Set<String> listenerThreadNames = Collections.synchronizedSet(new HashSet<String>());
-		List<String> receivedMessages = Collections.synchronizedList(new ArrayList<>());
-		containerProps.setMessageListener((MessageListener<Integer, String>) message -> {
-			listenerThreadNames.add(Thread.currentThread().getName());
-			try {
-				Thread.sleep(2000);
-			}
-			catch (InterruptedException e) {
-				// ignore
-			}
-			receivedMessages.add(message.value());
-			listenerThreadNames.add(Thread.currentThread().getName());
-			latch.countDown();
-		});
-
-		ConcurrentMessageListenerContainer<Integer, String> container =
-				new ConcurrentMessageListenerContainer<>(cf, containerProps);
-		ConcurrentMessageListenerContainer<Integer, String> container2 =
-				new ConcurrentMessageListenerContainer<>(cf, containerProps);
-		container.setConcurrency(1);
-		container2.setConcurrency(1);
-		container.setBeanName("testAuto");
-		container2.setBeanName("testAuto2");
-		container.start();
-		ContainerTestUtils.waitForAssignment(container, embeddedKafka.getPartitionsPerTopic());
-		Map<String, Object> senderProps = KafkaTestUtils.producerProps(embeddedKafka);
-		ProducerFactory<Integer, String> pf = new DefaultKafkaProducerFactory<>(senderProps);
-		KafkaTemplate<Integer, String> template = new KafkaTemplate<>(pf);
-		template.setDefaultTopic(topic1);
-		template.sendDefault(0, 0, "foo");
-		template.sendDefault(0, 2, "bar");
-		template.sendDefault(0, 0, "baz");
-		template.sendDefault(0, 2, "qux");
-		template.sendDefault(1, 2, "corge");
-		template.sendDefault(1, 2, "grault");
-		template.sendDefault(1, 2, "garply");
-		template.sendDefault(1, 2, "waldo");
-		template.flush();
-		container2.start();
-		assertThat(latch.await(60, TimeUnit.SECONDS)).isTrue();
-		assertThat(receivedMessages).containsOnlyOnce("foo", "bar", "baz", "qux", "corge", "grault", "garply", "waldo");
-		// all messages are received
-		assertThat(receivedMessages).hasSize(8);
-		// messages are received on separate threads
-		assertThat(listenerThreadNames.size()).isGreaterThanOrEqualTo(2);
-		container.stop();
-		container2.stop();
-		this.logger.info("Stop auto");
 	}
 
 }
