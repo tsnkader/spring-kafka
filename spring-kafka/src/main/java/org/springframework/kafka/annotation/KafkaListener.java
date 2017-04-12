@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,6 +77,7 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
  * {@link org.springframework.kafka.config.MultiMethodKafkaListenerEndpoint}.
  *
  * @author Gary Russell
+ * @author Venil Noronha
  *
  * @see EnableKafka
  * @see KafkaListenerAnnotationBeanPostProcessor
@@ -149,5 +150,13 @@ public @interface KafkaListener {
 	 */
 	@AliasFor("group")
 	String containerGroup() default "";
+
+	/**
+	 * Set an {@link org.springframework.kafka.listener.KafkaListenerErrorHandler} to
+	 * invoke if the listener method throws an exception.
+	 * @return the error handler.
+	 * @since 2.0
+	 */
+	String errorHandler() default "";
 
 }
