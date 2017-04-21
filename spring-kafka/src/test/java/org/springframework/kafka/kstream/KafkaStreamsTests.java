@@ -35,11 +35,11 @@ import org.apache.kafka.streams.kstream.KStreamBuilder;
 import org.apache.kafka.streams.kstream.TimeWindows;
 import org.apache.kafka.streams.processor.WallclockTimestampExtractor;
 import org.apache.kafka.streams.processor.internals.StreamThread;
-import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
@@ -56,6 +56,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
 import org.springframework.kafka.support.serializer.JsonSerde;
+import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.rule.KafkaEmbedded;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.annotation.DirtiesContext;
@@ -70,16 +71,17 @@ import org.springframework.util.concurrent.SettableListenableFuture;
  */
 @RunWith(SpringRunner.class)
 @DirtiesContext
+@EmbeddedKafka(partitions = 1,
+		topics = {
+				KafkaStreamsTests.STREAMING_TOPIC1,
+				KafkaStreamsTests.STREAMING_TOPIC2 })
 public class KafkaStreamsTests {
 
-	private static final String STREAMING_TOPIC1 = "streamingTopic1";
+	static final String STREAMING_TOPIC1 = "streamingTopic1";
 
-	private static final String STREAMING_TOPIC2 = "streamingTopic2";
+	static final String STREAMING_TOPIC2 = "streamingTopic2";
 
 	static final String FOOS = "foos";
-
-	@ClassRule
-	public static KafkaEmbedded embeddedKafka = new KafkaEmbedded(1, true, 1, STREAMING_TOPIC1, STREAMING_TOPIC2, FOOS);
 
 	@Autowired
 	private KafkaTemplate<Integer, String> kafkaTemplate;
@@ -90,7 +92,8 @@ public class KafkaStreamsTests {
 	@Autowired
 	private KStreamBuilderFactoryBean kStreamBuilderFactoryBean;
 
-
+	@Autowired
+	private KafkaEmbedded kafkaEmbedded;
 	@Test
 	public void testKStreams() throws Exception {
 		this.kStreamBuilderFactoryBean.stop();
@@ -130,6 +133,9 @@ public class KafkaStreamsTests {
 	@EnableKafkaStreams
 	public static class KafkaStreamsConfiguration {
 
+		@Value("${" + KafkaEmbedded.SPRING_EMBEDDED_KAFKA_BROKERS + "}")
+		private String brokerAddresses;
+
 		@Bean
 		public ProducerFactory<Integer, String> producerFactory() {
 			return new DefaultKafkaProducerFactory<>(producerConfigs());
@@ -137,7 +143,7 @@ public class KafkaStreamsTests {
 
 		@Bean
 		public Map<String, Object> producerConfigs() {
-			return KafkaTestUtils.producerProps(embeddedKafka);
+			return KafkaTestUtils.senderProps(this.brokerAddresses);
 		}
 
 		@Bean
@@ -151,7 +157,7 @@ public class KafkaStreamsTests {
 		public StreamsConfig kStreamsConfigs() {
 			Map<String, Object> props = new HashMap<>();
 			props.put(StreamsConfig.APPLICATION_ID_CONFIG, "testStreams");
-			props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafka.getBrokersAsString());
+			props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, this.brokerAddresses);
 			props.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, Serdes.Integer().getClass().getName());
 			props.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
 			props.put(StreamsConfig.TIMESTAMP_EXTRACTOR_CLASS_CONFIG, WallclockTimestampExtractor.class.getName());
@@ -181,7 +187,7 @@ public class KafkaStreamsTests {
 
 		@Bean
 		public Map<String, Object> consumerConfigs() {
-			Map<String, Object> consumerProps = KafkaTestUtils.consumerProps("testGroup", "false", embeddedKafka);
+			Map<String, Object> consumerProps = KafkaTestUtils.consumerProps(this.brokerAddresses, "testGroup", "false");
 			consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 			return consumerProps;
 		}
