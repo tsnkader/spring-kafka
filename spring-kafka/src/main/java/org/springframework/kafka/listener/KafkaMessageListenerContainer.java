@@ -880,7 +880,7 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 
 			private final ConsumerRecord<K, V> record;
 
-			private ConsumerAcknowledgment(ConsumerRecord<K, V> record) {
+			ConsumerAcknowledgment(ConsumerRecord<K, V> record) {
 				this.record = record;
 			}
 
@@ -902,7 +902,7 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 
 			private final List<ConsumerRecord<K, V>> records;
 
-			private ConsumerBatchAcknowledgment(List<ConsumerRecord<K, V>> records) {
+			ConsumerBatchAcknowledgment(List<ConsumerRecord<K, V>> records) {
 				// make a copy in case the listener alters the list
 				this.records = new LinkedList<ConsumerRecord<K, V>>(records);
 			}
