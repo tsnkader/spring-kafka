@@ -248,7 +248,7 @@ public class ConcurrentMessageListenerContainerTests {
 		DefaultKafkaConsumerFactory<Integer, String> cf = new DefaultKafkaConsumerFactory<Integer, String>(props) {
 
 			@Override
-			public Consumer<Integer, String> createConsumer() {
+			public Consumer<Integer, String> createConsumer(String clientIdSuffix) {
 				return new KafkaConsumer<Integer, String>(props) {
 
 					@Override
