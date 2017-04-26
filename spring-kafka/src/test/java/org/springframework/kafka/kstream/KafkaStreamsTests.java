@@ -94,6 +94,7 @@ public class KafkaStreamsTests {
 
 	@Autowired
 	private KafkaEmbedded kafkaEmbedded;
+
 	@Test
 	public void testKStreams() throws Exception {
 		this.kStreamBuilderFactoryBean.stop();
