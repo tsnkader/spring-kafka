@@ -50,7 +50,7 @@ import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
-import org.springframework.kafka.test.rule.KafkaEmbedded;
+import org.springframework.kafka.support.serializer.JsonSerde;import org.springframework.kafka.test.rule.KafkaEmbedded;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
@@ -58,6 +58,7 @@ import org.springframework.util.concurrent.SettableListenableFuture;
 
 /**
  * @author Artem Bilan
+ * @author Marius Bogoevici
  *
  * @since 1.1.4
  */
@@ -69,8 +70,10 @@ public class KafkaStreamsTests {
 
 	private static final String STREAMING_TOPIC2 = "streamingTopic2";
 
+	static final String FOOS = "foos";
+
 	@ClassRule
-	public static KafkaEmbedded embeddedKafka = new KafkaEmbedded(1, true, 1, STREAMING_TOPIC1, STREAMING_TOPIC2);
+	public static KafkaEmbedded embeddedKafka = new KafkaEmbedded(1, true, 1, STREAMING_TOPIC1, STREAMING_TOPIC2, FOOS);
 
 	@Autowired
 	private KafkaTemplate<Integer, String> kafkaTemplate;
@@ -85,14 +88,14 @@ public class KafkaStreamsTests {
 
 		this.kafkaTemplate.sendDefault(0, payload);
 		this.kafkaTemplate.sendDefault(0, payload2);
+		this.kafkaTemplate.flush();
 
-		String result = resultFuture.get(60, TimeUnit.SECONDS);
+		String result = resultFuture.get(600, TimeUnit.SECONDS);
 
 		assertThat(result).isNotNull();
 
 		assertThat(result).isEqualTo(payload.toUpperCase() + payload2.toUpperCase());
 	}
-
 
 	@Configuration
 	@EnableKafka
@@ -124,22 +127,22 @@ public class KafkaStreamsTests {
 			props.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, Serdes.Integer().getClass().getName());
 			props.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
 			props.put(StreamsConfig.TIMESTAMP_EXTRACTOR_CLASS_CONFIG, WallclockTimestampExtractor.class.getName());
+			props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, "100");
 			return new StreamsConfig(props);
 		}
 
 		@Bean
 		public KStream<Integer, String> kStream(KStreamBuilder kStreamBuilder) {
 			KStream<Integer, String> stream = kStreamBuilder.stream(STREAMING_TOPIC1);
-			stream
-					.mapValues(String::toUpperCase)
+			stream.mapValues(String::toUpperCase)
+					.mapValues(Foo::new)
+					.through(Serdes.Integer(), new JsonSerde<Foo>() { }, FOOS)
+					.mapValues(Foo::getName)
 					.groupByKey()
-					.reduce((String value1, String value2) -> value1 + value2,
-							TimeWindows.of(1000),
-							"windowStore")
+					.reduce((value1, value2) -> value1 + value2, TimeWindows.of(1000), "windowStore")
 					.toStream()
 					.map((windowedId, value) -> new KeyValue<>(windowedId.key(), value))
-					.filter((i, s) -> s.length() > 40)
-					.to(STREAMING_TOPIC2);
+					.filter((i, s) -> s.length() > 40).to(STREAMING_TOPIC2);
 
 			stream.print();
 
@@ -159,10 +162,8 @@ public class KafkaStreamsTests {
 		}
 
 		@Bean
-		public KafkaListenerContainerFactory<ConcurrentMessageListenerContainer<Integer, String>>
-		kafkaListenerContainerFactory() {
-			ConcurrentKafkaListenerContainerFactory<Integer, String> factory =
-					new ConcurrentKafkaListenerContainerFactory<>();
+		public KafkaListenerContainerFactory<ConcurrentMessageListenerContainer<Integer, String>> kafkaListenerContainerFactory() {
+			ConcurrentKafkaListenerContainerFactory<Integer, String> factory = new ConcurrentKafkaListenerContainerFactory<>();
 			factory.setConsumerFactory(consumerFactory());
 			return factory;
 		}
@@ -175,6 +176,27 @@ public class KafkaStreamsTests {
 		@KafkaListener(topics = STREAMING_TOPIC2)
 		public void listener(String payload) {
 			resultFuture().set(payload);
+		}
+
+	}
+
+	static class Foo {
+
+		private String name;
+
+		Foo() {
+		}
+
+		Foo(String name) {
+			this.name = name;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
 		}
 
 	}
