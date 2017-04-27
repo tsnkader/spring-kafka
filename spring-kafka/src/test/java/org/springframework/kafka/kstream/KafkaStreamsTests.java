@@ -50,7 +50,8 @@ import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
-import org.springframework.kafka.support.serializer.JsonSerde;import org.springframework.kafka.test.rule.KafkaEmbedded;
+import org.springframework.kafka.support.serializer.JsonSerde;
+import org.springframework.kafka.test.rule.KafkaEmbedded;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
@@ -136,7 +137,9 @@ public class KafkaStreamsTests {
 			KStream<Integer, String> stream = kStreamBuilder.stream(STREAMING_TOPIC1);
 			stream.mapValues(String::toUpperCase)
 					.mapValues(Foo::new)
-					.through(Serdes.Integer(), new JsonSerde<Foo>() { }, FOOS)
+					.through(Serdes.Integer(), new JsonSerde<Foo>() {
+
+					}, FOOS)
 					.mapValues(Foo::getName)
 					.groupByKey()
 					.reduce((value1, value2) -> value1 + value2, TimeWindows.of(1000), "windowStore")
