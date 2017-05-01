@@ -538,12 +538,12 @@ public class EnableKafkaIntegrationTests {
 
 		@Bean
 		public KafkaTemplate<Integer, String> template() {
-			return new KafkaTemplate<Integer, String>(producerFactory());
+			return new KafkaTemplate<>(producerFactory());
 		}
 
 		@Bean
 		public KafkaTemplate<Integer, String> kafkaJsonTemplate() {
-			KafkaTemplate<Integer, String> kafkaTemplate = new KafkaTemplate<Integer, String>(producerFactory());
+			KafkaTemplate<Integer, String> kafkaTemplate = new KafkaTemplate<>(producerFactory());
 			kafkaTemplate.setMessageConverter(new StringJsonMessageConverter());
 			return kafkaTemplate;
 		}
