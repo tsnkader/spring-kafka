@@ -17,6 +17,7 @@
 package org.springframework.kafka.kstream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,12 +26,14 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.KStreamBuilder;
 import org.apache.kafka.streams.kstream.TimeWindows;
 import org.apache.kafka.streams.processor.WallclockTimestampExtractor;
+import org.apache.kafka.streams.processor.internals.StreamThread;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -47,6 +50,7 @@ import org.springframework.kafka.config.KafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
+import org.springframework.kafka.core.KStreamBuilderFactoryBean;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
@@ -82,8 +86,19 @@ public class KafkaStreamsTests {
 	@Autowired
 	private SettableListenableFuture<String> resultFuture;
 
+	@Autowired
+	private KStreamBuilderFactoryBean kStreamBuilderFactoryBean;
+
+
 	@Test
 	public void testKStreams() throws Exception {
+		this.kStreamBuilderFactoryBean.stop();
+
+		Thread.UncaughtExceptionHandler exceptionHandler = mock(Thread.UncaughtExceptionHandler.class);
+		this.kStreamBuilderFactoryBean.setUncaughtExceptionHandler(exceptionHandler);
+
+		this.kStreamBuilderFactoryBean.start();
+
 		String payload = "foo" + UUID.randomUUID().toString();
 		String payload2 = "foo" + UUID.randomUUID().toString();
 
@@ -96,6 +111,12 @@ public class KafkaStreamsTests {
 		assertThat(result).isNotNull();
 
 		assertThat(result).isEqualTo(payload.toUpperCase() + payload2.toUpperCase());
+
+		KafkaStreams kafkaStreams = this.kStreamBuilderFactoryBean.getKafkaStreams();
+
+		StreamThread[] threads = KafkaTestUtils.getPropertyValue(kafkaStreams, "threads", StreamThread[].class);
+		assertThat(threads).isNotEmpty();
+		assertThat(threads[0].getUncaughtExceptionHandler()).isSameAs(exceptionHandler);
 	}
 
 	@Configuration

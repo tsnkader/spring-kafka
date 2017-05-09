@@ -52,6 +52,8 @@ public class KStreamBuilderFactoryBean extends AbstractFactoryBean<KStreamBuilde
 
 	private volatile boolean running;
 
+	private Thread.UncaughtExceptionHandler exceptionHandler;
+
 	public KStreamBuilderFactoryBean(StreamsConfig streamsConfig) {
 		Assert.notNull(streamsConfig, "'streamsConfig' must not be null");
 		this.streamsConfig = streamsConfig;
@@ -65,6 +67,10 @@ public class KStreamBuilderFactoryBean extends AbstractFactoryBean<KStreamBuilde
 	public void setClientSupplier(KafkaClientSupplier clientSupplier) {
 		Assert.notNull(clientSupplier, "'clientSupplier' must not be null");
 		this.clientSupplier = clientSupplier;
+	}
+
+	public void setUncaughtExceptionHandler(Thread.UncaughtExceptionHandler exceptionHandler) {
+		this.exceptionHandler = exceptionHandler;
 	}
 
 	@Override
@@ -104,6 +110,7 @@ public class KStreamBuilderFactoryBean extends AbstractFactoryBean<KStreamBuilde
 		if (!this.running) {
 			try {
 				this.kafkaStreams = new KafkaStreams(getObject(), this.streamsConfig, this.clientSupplier);
+				this.kafkaStreams.setUncaughtExceptionHandler(this.exceptionHandler);
 				this.kafkaStreams.start();
 				this.running = true;
 			}
