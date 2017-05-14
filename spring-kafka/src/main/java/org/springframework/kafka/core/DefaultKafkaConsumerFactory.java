@@ -66,14 +66,16 @@ public class DefaultKafkaConsumerFactory<K, V> implements ConsumerFactory<K, V>,
 		this.valueDeserializer = valueDeserializer;
 	}
 
-	/**
-	 * Return an unmodifiable reference to the configuration map for this factory.
-	 * Useful for cloning to make a similar factory.
-	 * @return the configs.
-	 * @since 1.0.6
-	 */
 	public Map<String, Object> getConfigurationProperties() {
 		return Collections.unmodifiableMap(this.configs);
+	}
+
+	public Deserializer<K> getKeyDeserializer() {
+		return this.keyDeserializer;
+	}
+
+	public Deserializer<V> getValueDeserializer() {
+		return this.valueDeserializer;
 	}
 
 	@Override
@@ -83,22 +85,32 @@ public class DefaultKafkaConsumerFactory<K, V> implements ConsumerFactory<K, V>,
 
 	@Override
 	public Consumer<K, V> createConsumer(String clientIdSuffix) {
-		return createKafkaConsumer(clientIdSuffix);
+		return createKafkaConsumer(null, clientIdSuffix);
+	}
+
+	@Override
+	public Consumer<K, V> createConsumer(String groupId, String clientIdSuffix) {
+		return createKafkaConsumer(groupId, clientIdSuffix);
 	}
 
 	protected KafkaConsumer<K, V> createKafkaConsumer() {
 		return createKafkaConsumer(this.configs);
 	}
 
-	protected KafkaConsumer<K, V> createKafkaConsumer(String clientIdSuffix) {
-		if (!this.configs.containsKey(ConsumerConfig.CLIENT_ID_CONFIG) || clientIdSuffix == null) {
+	protected KafkaConsumer<K, V> createKafkaConsumer(String groupId, String clientIdSuffix) {
+		if (groupId == null && (!this.configs.containsKey(ConsumerConfig.CLIENT_ID_CONFIG) || clientIdSuffix == null)) {
 			return createKafkaConsumer();
 		}
 		else {
-			Map<String, Object> modifiedClientIdConfigs = new HashMap<>(this.configs);
-			modifiedClientIdConfigs.put(ConsumerConfig.CLIENT_ID_CONFIG,
-					modifiedClientIdConfigs.get(ConsumerConfig.CLIENT_ID_CONFIG) + clientIdSuffix);
-			return createKafkaConsumer(modifiedClientIdConfigs);
+			Map<String, Object> modifiedConfigs = new HashMap<>(this.configs);
+			if (groupId != null) {
+				modifiedConfigs.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+			}
+			if (clientIdSuffix != null) {
+				modifiedConfigs.put(ConsumerConfig.CLIENT_ID_CONFIG,
+					modifiedConfigs.get(ConsumerConfig.CLIENT_ID_CONFIG) + clientIdSuffix);
+			}
+			return createKafkaConsumer(modifiedConfigs);
 		}
 	}
 

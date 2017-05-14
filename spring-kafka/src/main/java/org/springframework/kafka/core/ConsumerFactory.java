@@ -28,9 +28,36 @@ import org.apache.kafka.clients.consumer.Consumer;
  */
 public interface ConsumerFactory<K, V> {
 
+	/**
+	 * Create a consumer with the group id and client id as configured in the properties.
+	 * @return the consumer.
+	 */
 	Consumer<K, V> createConsumer();
 
-	boolean isAutoCommit();
+	/**
+	 * Create a consumer, appending the suffix to the {@code client.id} property,
+	 * if present.
+	 * @param clientIdSuffix the suffix.
+	 * @return the consumer.
+	 * @since 2.0
+	 */
+	Consumer<K, V> createConsumer(String clientIdSuffix);
 
+	/**
+	 * Create a consumer with an explicit group id; in addition, the
+	 * client id suffix is appended to the {@code client.id} property, if both
+	 * are present.
+	 * @param groupId the group id.
+	 * @param clientIdSuffix the suffix.
+	 * @return the consumer.
+	 * @since 2.0
+	 */
+	Consumer<K, V> createConsumer(String groupId, String clientIdSuffix);
+
+	/**
+	 * Return true if consumers created by this factory use auto commit.
+	 * @return true if auto commit.
+	 */
+	boolean isAutoCommit();
 
 }

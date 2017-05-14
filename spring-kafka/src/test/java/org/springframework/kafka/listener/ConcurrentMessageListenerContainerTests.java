@@ -19,6 +19,7 @@ package org.springframework.kafka.listener;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 
 import java.util.Arrays;
@@ -391,7 +392,7 @@ public class ConcurrentMessageListenerContainerTests {
 		};
 		ConsumerFactory<Integer, String> cf = mock(ConsumerFactory.class);
 		Consumer<Integer, String> consumer = mock(Consumer.class);
-		given(cf.createConsumer()).willReturn(consumer);
+		given(cf.createConsumer(anyString(), anyString())).willReturn(consumer);
 		given(consumer.poll(anyLong()))
 			.willAnswer(new Answer<ConsumerRecords<Integer, String>>() {
 

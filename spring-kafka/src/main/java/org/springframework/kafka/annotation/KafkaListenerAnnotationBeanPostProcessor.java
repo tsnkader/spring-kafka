@@ -71,6 +71,7 @@ import org.springframework.messaging.handler.invocation.HandlerMethodArgumentRes
 import org.springframework.messaging.handler.invocation.InvocableHandlerMethod;
 import org.springframework.util.Assert;
 import org.springframework.util.ReflectionUtils;
+import org.springframework.util.ReflectionUtils.MethodFilter;
 import org.springframework.util.StringUtils;
 
 /**
@@ -252,7 +253,7 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 					});
 			if (hasClassLevelListeners) {
 				Set<Method> methodsWithHandler = MethodIntrospector.selectMethods(targetClass,
-						new ReflectionUtils.MethodFilter() {
+						new MethodFilter() {
 
 							@Override
 							public boolean matches(Method method) {
@@ -369,10 +370,10 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 			catch (NoSuchMethodException ex) {
 				throw new IllegalStateException(String.format(
 						"@KafkaListener method '%s' found on bean target class '%s', " +
-						"but not found in any interface(s) for bean JDK proxy. Either " +
-						"pull the method up to an interface or switch to subclass (CGLIB) " +
-						"proxies by setting proxy-target-class/proxyTargetClass " +
-						"attribute to 'true'", method.getName(), method.getDeclaringClass().getSimpleName()), ex);
+								"but not found in any interface(s) for bean JDK proxy. Either " +
+								"pull the method up to an interface or switch to subclass (CGLIB) " +
+								"proxies by setting proxy-target-class/proxyTargetClass " +
+								"attribute to 'true'", method.getName(), method.getDeclaringClass().getSimpleName()), ex);
 			}
 		}
 		return method;
@@ -383,6 +384,7 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 		endpoint.setBean(bean);
 		endpoint.setMessageHandlerMethodFactory(this.messageHandlerMethodFactory);
 		endpoint.setId(getEndpointId(kafkaListener));
+		endpoint.setGroupId(getEndpointGroupId(kafkaListener, endpoint.getId()));
 		endpoint.setTopicPartitions(resolveTopicPartitions(kafkaListener));
 		endpoint.setTopics(resolveTopics(kafkaListener));
 		endpoint.setTopicPattern(resolvePattern(kafkaListener));
@@ -418,6 +420,17 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 		else {
 			return "org.springframework.kafka.KafkaListenerEndpointContainer#" + this.counter.getAndIncrement();
 		}
+	}
+
+	private String getEndpointGroupId(KafkaListener kafkaListener, String id) {
+		String groupId = null;
+		if (StringUtils.hasText(kafkaListener.groupId())) {
+			groupId = resolveExpressionAsString(kafkaListener.groupId(), "groupId");
+		}
+		if (groupId == null && kafkaListener.idIsGroup()) {
+			groupId = id;
+		}
+		return groupId;
 	}
 
 	private TopicPartitionInitialOffset[] resolveTopicPartitions(KafkaListener kafkaListener) {
@@ -490,7 +503,7 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 			else {
 				throw new IllegalArgumentException(String.format(
 						"@PartitionOffset for topic '%s' can't resolve '%s' as an Integer or String, resolved to '%s'",
-							topic, partitionOffset.partition(), partitionValue.getClass()));
+						topic, partitionOffset.partition(), partitionValue.getClass()));
 			}
 
 			Object initialOffsetValue = resolveExpression(partitionOffset.initialOffset());
@@ -506,7 +519,7 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 			else {
 				throw new IllegalArgumentException(String.format(
 						"@PartitionOffset for topic '%s' can't resolve '%s' as a Long or String, resolved to '%s'",
-							topic, partitionOffset.initialOffset(), initialOffsetValue.getClass()));
+						topic, partitionOffset.initialOffset(), initialOffsetValue.getClass()));
 			}
 
 			Object relativeToCurrentValue = resolveExpression(partitionOffset.relativeToCurrent());
@@ -520,7 +533,7 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 			else {
 				throw new IllegalArgumentException(String.format(
 						"@PartitionOffset for topic '%s' can't resolve '%s' as a Boolean or String, resolved to '%s'",
-							topic, partitionOffset.relativeToCurrent(), relativeToCurrentValue.getClass()));
+						topic, partitionOffset.relativeToCurrent(), relativeToCurrentValue.getClass()));
 			}
 
 			TopicPartitionInitialOffset topicPartitionOffset =
