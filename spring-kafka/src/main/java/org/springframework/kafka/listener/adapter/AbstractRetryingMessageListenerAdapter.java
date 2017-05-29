@@ -36,6 +36,17 @@ public class AbstractRetryingMessageListenerAdapter<K, V> {
 
 	protected final Log logger = LogFactory.getLog(this.getClass());
 
+	/**
+	 * {@link org.springframework.retry.RetryContext} attribute key for an acknowledgment
+	 * if the listener is capable of acknowledging.
+	 */
+	public static final String CONTEXT_ACKNOWLEDGMENT = "acknowledgment";
+
+	/**
+	 * {@link org.springframework.retry.RetryContext} attribute key for the record.
+	 */
+	public static final String CONTEXT_RECORD = "record";
+
 	private final RetryTemplate retryTemplate;
 
 	private final RecoveryCallback<Void> recoveryCallback;
