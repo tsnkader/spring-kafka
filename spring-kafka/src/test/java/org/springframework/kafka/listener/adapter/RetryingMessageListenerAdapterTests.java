@@ -46,8 +46,7 @@ public class RetryingMessageListenerAdapterTests {
 					context.set(c);
 					return null;
 				});
-		@SuppressWarnings("unchecked")
-		ConsumerRecord<String, String> record = mock(ConsumerRecord.class);
+		ConsumerRecord<String, String> record = new ConsumerRecord<>("mockTopic", 0, 0, null, null);
 		adapter.onMessage(record);
 		assertThat(context.get()).isNotNull();
 		assertThat(context.get().getAttribute(RetryingMessageListenerAdapter.CONTEXT_ACKNOWLEDGMENT)).isNull();
@@ -65,8 +64,7 @@ public class RetryingMessageListenerAdapterTests {
 					context.set(c);
 					return null;
 				});
-		@SuppressWarnings("unchecked")
-		ConsumerRecord<String, String> record = mock(ConsumerRecord.class);
+		ConsumerRecord<String, String> record = new ConsumerRecord<>("mockTopic", 0, 0, null, null);
 		Acknowledgment ack = mock(Acknowledgment.class);
 		adapter.onMessage(record, ack);
 		assertThat(context.get()).isNotNull();
