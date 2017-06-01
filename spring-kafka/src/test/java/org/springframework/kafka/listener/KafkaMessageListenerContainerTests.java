@@ -115,9 +115,13 @@ public class KafkaMessageListenerContainerTests {
 
 	private static String topic14 = "testTopic14";
 
+	private static String topic15 = "testTopic15";
+
+	private static String topic16 = "testTopic16";
+
 	@ClassRule
 	public static KafkaEmbedded embeddedKafka = new KafkaEmbedded(1, true, topic1, topic2, topic3, topic4, topic5,
-			topic6, topic7, topic8, topic9, topic10, topic11, topic12, topic13, topic14);
+			topic6, topic7, topic8, topic9, topic10, topic11, topic12, topic13, topic14, topic15, topic16);
 
 	@Rule
 	public TestName testName = new TestName();
@@ -378,26 +382,26 @@ public class KafkaMessageListenerContainerTests {
 		final BitSet bitSet = new BitSet(6);
 		final Map<String, AtomicInteger> faults = new HashMap<>();
 		RetryingMessageListenerAdapter<Integer, String> adapter = new RetryingMessageListenerAdapter<>(
-					new MessageListener<Integer, String>() {
+				new MessageListener<Integer, String>() {
 
-				@Override
-				public void onMessage(ConsumerRecord<Integer, String> message) {
-					logger.info("slow3: " + message);
-					bitSet.set((int) (message.partition() * 3 + message.offset()));
-					String key = message.topic() + message.partition() + message.offset();
-					if (faults.get(key) == null) {
-						faults.put(key, new AtomicInteger(1));
+					@Override
+					public void onMessage(ConsumerRecord<Integer, String> message) {
+						logger.info("slow3: " + message);
+						bitSet.set((int) (message.partition() * 3 + message.offset()));
+						String key = message.topic() + message.partition() + message.offset();
+						if (faults.get(key) == null) {
+							faults.put(key, new AtomicInteger(1));
+						}
+						else {
+							faults.get(key).incrementAndGet();
+						}
+						latch.countDown(); // 3 per = 18
+						if (faults.get(key).get() < 3) { // succeed on the third attempt
+							throw new FooEx();
+						}
 					}
-					else {
-						faults.get(key).incrementAndGet();
-					}
-					latch.countDown(); // 3 per = 18
-					if (faults.get(key).get() < 3) { // succeed on the third attempt
-						throw new FooEx();
-					}
-				}
 
-			}, buildRetry(), null);
+				}, buildRetry(), null);
 		containerProps.setMessageListener(adapter);
 		containerProps.setPauseAfter(100);
 
@@ -440,34 +444,34 @@ public class KafkaMessageListenerContainerTests {
 		final BitSet bitSet = new BitSet(6);
 		final Map<String, AtomicInteger> faults = new HashMap<>();
 		RetryingMessageListenerAdapter<Integer, String> adapter = new RetryingMessageListenerAdapter<>(
-			new MessageListener<Integer, String>() {
+				new MessageListener<Integer, String>() {
 
-				@Override
-				public void onMessage(ConsumerRecord<Integer, String> message) {
-					logger.info("slow4: " + message);
-					bitSet.set((int) (message.partition() * 4 + message.offset()));
-					String key = message.topic() + message.partition() + message.offset();
-					if (faults.get(key) == null) {
-						faults.put(key, new AtomicInteger(1));
-					}
-					else {
-						faults.get(key).incrementAndGet();
-					}
-					latch.countDown(); // 3 per = 18
-					if (faults.get(key).get() == 1) {
-						try {
-							Thread.sleep(1000);
+					@Override
+					public void onMessage(ConsumerRecord<Integer, String> message) {
+						logger.info("slow4: " + message);
+						bitSet.set((int) (message.partition() * 4 + message.offset()));
+						String key = message.topic() + message.partition() + message.offset();
+						if (faults.get(key) == null) {
+							faults.put(key, new AtomicInteger(1));
 						}
-						catch (InterruptedException e) {
-							Thread.currentThread().interrupt();
+						else {
+							faults.get(key).incrementAndGet();
+						}
+						latch.countDown(); // 3 per = 18
+						if (faults.get(key).get() == 1) {
+							try {
+								Thread.sleep(1000);
+							}
+							catch (InterruptedException e) {
+								Thread.currentThread().interrupt();
+							}
+						}
+						if (faults.get(key).get() < 3) { // succeed on the third attempt
+							throw new FooEx();
 						}
 					}
-					if (faults.get(key).get() < 3) { // succeed on the third attempt
-						throw new FooEx();
-					}
-				}
 
-			}, buildRetry(), null);
+				}, buildRetry(), null);
 		containerProps.setMessageListener(adapter);
 		containerProps.setPauseAfter(100);
 
@@ -856,15 +860,62 @@ public class KafkaMessageListenerContainerTests {
 
 	@Test
 	public void testSeekAutoCommitDefault() throws Exception {
-		Map<String, Object> props = KafkaTestUtils.consumerProps("test12", "true", embeddedKafka);
+		Map<String, Object> props = KafkaTestUtils.consumerProps("test15", "true", embeddedKafka);
 		props.remove(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG); // test true by default
-		testSeekGuts(props, topic12, true);
+		testSeekGuts(props, topic15, true);
+	}
+
+	@Test
+	public void testSeekBatch() throws Exception {
+		logger.info("Start seek batch seek");
+		Map<String, Object> props = KafkaTestUtils.consumerProps("test16", "true", embeddedKafka);
+		DefaultKafkaConsumerFactory<Integer, String> cf = new DefaultKafkaConsumerFactory<>(props);
+		ContainerProperties containerProps = new ContainerProperties(topic16);
+		final CountDownLatch registerLatch = new CountDownLatch(1);
+		final CountDownLatch assignedLatch = new CountDownLatch(1);
+		final CountDownLatch idleLatch = new CountDownLatch(1);
+		class Listener implements BatchMessageListener<Integer, String>, ConsumerSeekAware {
+
+			@Override
+			public void onMessage(List<ConsumerRecord<Integer, String>> data) {
+				// empty
+			}
+
+			@Override
+			public void registerSeekCallback(ConsumerSeekCallback callback) {
+				registerLatch.countDown();
+			}
+
+			@Override
+			public void onPartitionsAssigned(Map<TopicPartition, Long> assignments, ConsumerSeekCallback callback) {
+				assignedLatch.countDown();
+			}
+
+			@Override
+			public void onIdleContainer(Map<TopicPartition, Long> assignments, ConsumerSeekCallback callback) {
+				idleLatch.countDown();
+			}
+
+		}
+		Listener messageListener = new Listener();
+		containerProps.setMessageListener(messageListener);
+		containerProps.setSyncCommits(true);
+		containerProps.setAckOnError(false);
+		containerProps.setIdleEventInterval(10L);
+		KafkaMessageListenerContainer<Integer, String> container = new KafkaMessageListenerContainer<>(cf,
+				containerProps);
+		container.setBeanName("testBatchSeek");
+		container.start();
+		assertThat(registerLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(assignedLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(idleLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		container.stop();
 	}
 
 	private void testSeekGuts(Map<String, Object> props, String topic, boolean autoCommit) throws Exception {
 		logger.info("Start seek " + topic);
 		DefaultKafkaConsumerFactory<Integer, String> cf = new DefaultKafkaConsumerFactory<>(props);
-		ContainerProperties containerProps = new ContainerProperties(topic11);
+		ContainerProperties containerProps = new ContainerProperties(topic);
 		final AtomicReference<CountDownLatch> latch = new AtomicReference<>(new CountDownLatch(6));
 		final AtomicBoolean seekInitial = new AtomicBoolean();
 		final CountDownLatch idleLatch = new CountDownLatch(1);
@@ -881,8 +932,8 @@ public class KafkaMessageListenerContainerTests {
 				messageThread = Thread.currentThread();
 				latch.get().countDown();
 				if (latch.get().getCount() == 2 && !seekInitial.get()) {
-					callback.seek(topic11, 0, 1);
-					callback.seek(topic11, 1, 1);
+					callback.seek(topic, 0, 1);
+					callback.seek(topic, 1, 1);
 				}
 			}
 
@@ -922,16 +973,16 @@ public class KafkaMessageListenerContainerTests {
 
 		KafkaMessageListenerContainer<Integer, String> container = new KafkaMessageListenerContainer<>(cf,
 				containerProps);
-		container.setBeanName("testRecordAcks");
+		container.setBeanName("testSeek" + topic);
 		container.start();
 		assertThat(KafkaTestUtils.getPropertyValue(container, "listenerConsumer.autoCommit", Boolean.class))
-			.isEqualTo(autoCommit);
+				.isEqualTo(autoCommit);
 		Consumer<?, ?> consumer = spyOnConsumer(container);
 		ContainerTestUtils.waitForAssignment(container, embeddedKafka.getPartitionsPerTopic());
 		Map<String, Object> senderProps = KafkaTestUtils.producerProps(embeddedKafka);
 		ProducerFactory<Integer, String> pf = new DefaultKafkaProducerFactory<>(senderProps);
 		KafkaTemplate<Integer, String> template = new KafkaTemplate<>(pf);
-		template.setDefaultTopic(topic11);
+		template.setDefaultTopic(topic);
 		template.sendDefault(0, 0, "foo");
 		template.sendDefault(1, 0, "bar");
 		template.sendDefault(0, 0, "baz");
@@ -1266,14 +1317,14 @@ public class KafkaMessageListenerContainerTests {
 			KafkaMessageListenerContainer<Integer, String> resettingContainer) {
 		willAnswer(invocation -> {
 			listenerConsumerAvailableLatch.countDown();
-				try {
-					assertThat(listenerConsumerStartLatch.await(10, TimeUnit.SECONDS)).isTrue();
-				}
-				catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-					throw new IllegalStateException(e);
-				}
-				return invocation.callRealMethod();
+			try {
+				assertThat(listenerConsumerStartLatch.await(10, TimeUnit.SECONDS)).isTrue();
+			}
+			catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new IllegalStateException(e);
+			}
+			return invocation.callRealMethod();
 		}).given(resettingContainer).setRunning(true);
 	}
 
