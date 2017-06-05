@@ -59,6 +59,8 @@ import org.springframework.context.Lifecycle;
  */
 public class DefaultKafkaProducerFactory<K, V> implements ProducerFactory<K, V>, Lifecycle, DisposableBean {
 
+	private static final int DEFAULT_PHYSICAL_CLOSE_TIMEOUT = 30;
+
 	private static final Log logger = LogFactory.getLog(DefaultKafkaProducerFactory.class);
 
 	private final Map<String, Object> configs;
@@ -68,6 +70,8 @@ public class DefaultKafkaProducerFactory<K, V> implements ProducerFactory<K, V>,
 	private Serializer<K> keySerializer;
 
 	private Serializer<V> valueSerializer;
+
+	private int physicalCloseTimeout = DEFAULT_PHYSICAL_CLOSE_TIMEOUT;
 
 	private volatile boolean running;
 
@@ -90,12 +94,22 @@ public class DefaultKafkaProducerFactory<K, V> implements ProducerFactory<K, V>,
 		this.valueSerializer = valueSerializer;
 	}
 
+	/**
+	 * The time to wait when physically closing the producer (when {@link #stop()} or {@link #destroy()} is invoked.
+	 * Specified in seconds; default {@value #DEFAULT_PHYSICAL_CLOSE_TIMEOUT}.
+	 * @param physicalCloseTimeout the timeout in seconds.
+	 * @since 1.0.7
+	 */
+	public void setPhysicalCloseTimeout(int physicalCloseTimeout) {
+		this.physicalCloseTimeout = physicalCloseTimeout;
+	}
+
 	@Override
 	public void destroy() throws Exception { //NOSONAR
 		CloseSafeProducer<K, V> producer = this.producer;
 		this.producer = null;
 		if (producer != null) {
-			producer.delegate.close();
+			producer.delegate.close(this.physicalCloseTimeout, TimeUnit.SECONDS);
 		}
 	}
 
