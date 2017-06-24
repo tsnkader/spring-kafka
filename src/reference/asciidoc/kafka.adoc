@@ -596,6 +596,133 @@ static class MultiListenerBean {
 }
 ----
 
+<<<<<<< HEAD
+=======
+[[rebalance-listeners]]
+===== Rebalance Listeners
+
+`ContainerProperties` has a property `consumerRebalanceListener` which takes an implementation of the Kafka client's `ConsumerRebalanceListener` interface.
+If this property is not provided, the container will configure a simple logging listener that logs rebalance events under the `INFO` level.
+The framework also adds a sub-interface `ConsumerAwareRebalanceListener`:
+
+[source, java]
+----
+public interface ConsumerAwareRebalanceListener extends ConsumerRebalanceListener {
+
+    void onPartitionsRevokedBeforeCommit(Consumer<?, ?> consumer, Collection<TopicPartition> partitions);
+
+    void onPartitionsRevokedAfterCommit(Consumer<?, ?> consumer, Collection<TopicPartition> partitions);
+
+    void onPartitionsAssigned(Consumer<?, ?> consumer, Collection<TopicPartition> partitions);
+
+}
+----
+
+Notice that there are two callbacks when partitions are revoked: the first is called immediately; the second is called after any pending offsets are committed.
+This is useful if you wish to maintain offsets in some external repository; for example:
+
+[source, java]
+----
+containerProperties.setConsumerRebalanceListener(new ConsumerAwareRebalanceListener() {
+
+    @Override
+    public void onPartitionsRevokedBeforeCommit(Consumer<?, ?> consumer, Collection<TopicPartition> partitions) {
+        // acknowledge any pending Acknowledgments (if using manual acks)
+    }
+
+    @Override
+    public void onPartitionsRevokedAfterCommit(Consumer<?, ?> consumer, Collection<TopicPartition> partitions) {
+        // ...
+            store(consumer.position(partition));
+        // ...
+    }
+
+    @Override
+    public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
+        // ...
+            consumer.seek(partition, offsetTracker.getOffset() + 1);
+        // ...
+    }
+});
+----
+
+[[annotation-send-to]]
+===== Forwarding Listener Results using @SendTo
+
+Starting with _version 2.0_, if you also annotate a `@KafkaListener` with a `@SendTo` annotation and the method invocation returns a result, the result will be forwared to the topic specified by the `@SendTo`.
+
+The `@SendTo` value can have several forms:
+
+- `@SendTo("someTopic")` routes to the literal topic
+- `@SendTo("#{someExpression}")` routes to the topic determined by evaluating the expression once during application context initialization.
+- `@SendTo("!{someExpression}")` routes to the topic determined by evaluating the expression at runtime.
+The `#root` object for the evaluation has 3 properties:
+  - request - the inbound `ConsumerRecord` (or `ConsumerRecords` object for a batch listener))
+  - source - the `org.springframework.messaging.Message<?>` converted from the `request`.
+  - result - the method return result.
+
+The result of the expression evaluation must be a `String` representing the topic name.
+
+[source, java]
+----
+@KafkaListener(topics = "annotated21")
+@SendTo("!{request.value()}") // runtime SpEL
+public String replyingListener(String in) {
+    ...
+}
+
+@KafkaListener(topics = "annotated22")
+@SendTo("#{myBean.replyTopic}") // config time SpEL
+public Collection<String> replyingBatchListener(List<String> in) {
+    ...
+}
+
+@KafkaListener(topics = "annotated23")
+@SendTo("annotated23reply") // static reply topic definition
+public String replyingListenerWithErrorHandler(String in) {
+    ...
+}
+...
+@KafkaListener(topics = "annotated25")
+@SendTo("annotated25reply1")
+public class MultiListenerSendTo {
+
+    @KafkaHandler
+    public String foo(String in) {
+        ...
+    }
+
+    @KafkaHandler
+    @SendTo("!{'annotated25reply2'}")
+    public String bar(@Payload(required = false) KafkaNull nul,
+            @Header(KafkaHeaders.RECEIVED_MESSAGE_KEY) int key) {
+        ...
+    }
+
+}
+----
+
+When using `@SendTo`, the `ConcurrentKafkaListenerContainerFactory` must be configured with a `KafkaTemplate` in its `replyTemplate` property, to perform the send.
+Note: only the simple `send(topic, value)` method is used, so you may wish to create a subclass to generate the partition and/or key...
+
+[source, java]
+----
+@Bean
+public KafkaTemplate<String, String> myReplyingTemplate() {
+    return new KafkaTemplate<Integer, String>(producerFactory()) {
+
+        @Override
+        public ListenableFuture<SendResult<String, String>> send(String topic, String data) {
+            return super.send(topic, partitionForData(data), keyForData(data), data);
+        }
+
+        ...
+
+    };
+}
+----
+
+>>>>>>> 6755f5f... GH-352: Add HeaderMapper for 0.11.0.0 Headers
 ===== Filtering Messages
 
 In certain scenarios, such as rebalancing, a message may be redelivered that has already been processed.
@@ -843,6 +970,87 @@ public void jsonListener(Foo foo) {
 When using a `@KafkaListener`, the parameter type is provided to the message converter to assist with the conversion.
 
 NOTE: When using the `StringJsonMessageConverter`, you should use a `StringDeserializer` in the kafka consumer configuration and `StringSerializer` in the kafka producer configuration, when using Spring Integration or the `KafkaTemplate.send(Message<?> message)` method.
+
+[[headers]]
+==== Message Headers
+
+The 0.11.0.0 client introduced support for headers in messages.
+Spring for Apache Kafka _version 2.0_ now supports mapping these headers to/from `spring-messaging` `MessageHeaders`.
+
+NOTE: Previous versions mapped `ConsumerRecord` and `ProducerRecord` to spring-messaging `Message<?>` where the value property is mapped to/from the `payload` and other properties (`topic`, `partition`, etc) were mapped to headers.
+This is still the case but additional, arbitrary, headers can now be mapped.
+
+Apache Kafka headers have a simple API:
+
+[source, java]
+----
+public interface Header {
+
+    String key();
+
+    byte[] value();
+
+}
+----
+
+The `KafkaHeaderMapper` strategy is provided to map header entries between Kafka `Headers` and `MessageHeaders`:
+
+[source, java]
+----
+public interface KafkaHeaderMapper {
+
+    void fromHeaders(MessageHeaders headers, Headers target);
+
+    void toHeaders(Headers source, Map<String, Object> target);
+
+}
+----
+
+The `DefaultKafkaHeaderMapper` maps the key to the `MessageHeaders` header name and, in order to support rich header types, for outbound messages, JSON conversion is performed.
+A "special" header, with key, `spring_json_header_types` contains a JSON map of `<key>:<type>`.
+This header is used on the inbound side to provide appropriate conversion of each header value to the original type.
+
+On the inbound side, all Kafka `Header` s are mapped to `MessageHeaders`.
+On the outbound side, by default, all `MessageHeaders` are mapped except `id`, `timestamp`, and the headers that map to `ConsumerRecord` properties.
+
+You can specify which headers are to be mapped for outbound messages, by providing patterns to the mapper.
+
+[source, java]
+----
+public DefaultKafkaHeaderMapper() {
+    ...
+}
+
+public DefaultKafkaHeaderMapper(ObjectMapper objectMapper) {
+    ...
+}
+
+public DefaultKafkaHeaderMapper(String... patterns) {
+    ...
+}
+
+public DefaultKafkaHeaderMapper(ObjectMapper objectMapper, String... patterns) {
+    ...
+}
+----
+
+The first constructor will use a default Jackson `ObjectMapper` and map most headers, as discussed above.
+The second constructor will use the provided Jackson `ObjectMapper` and map most headers, as discussed above.
+The third constructor will use a default Jackson `ObjectMapper` and map headers according to the provided patterns.
+The third constructor will use the provided Jackson `ObjectMapper` and map headers according to the provided patterns.
+
+Patterns are rather simple and can contain either a leading or trailing wildcard `*`, or both, e.g. `*.foo.*`.
+Patterns can be negated with a leading `!`.
+The first pattern that matches a header name wins (positive or negative).
+
+When providing your own patterns, it is recommended to include `!id` and `!timestamp` since these headers are read-only on the inbound side.
+
+IMPORTANT: By default, the mapper will only deserialize classes in `java.lang` and `java.util`.
+You can trust other (or all) packages by adding trusted packages using the `addTrustedPackages` method.
+If you are receiving messages from untrusted sources, you may wish to add just those packages that you trust.
+To trust all packages use `mapper.addTrustedPackages("*")`.
+
+The `DefaultKafkaHeaderMapper` is used in the `MessagingMessageConverter` by default.
 
 ==== Log Compaction
 

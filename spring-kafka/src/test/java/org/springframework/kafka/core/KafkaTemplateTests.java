@@ -17,11 +17,13 @@
 package org.springframework.kafka.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.springframework.kafka.test.assertj.KafkaConditions.key;
 import static org.springframework.kafka.test.assertj.KafkaConditions.partition;
 import static org.springframework.kafka.test.assertj.KafkaConditions.timestamp;
 import static org.springframework.kafka.test.assertj.KafkaConditions.value;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -35,6 +37,7 @@ import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.assertj.core.api.Assertions;
@@ -43,6 +46,8 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 
+import org.springframework.kafka.support.Acknowledgment;
+import org.springframework.kafka.support.DefaultKafkaHeaderMapper;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.kafka.support.ProducerListenerAdapter;
 import org.springframework.kafka.support.SendResult;
@@ -179,17 +184,29 @@ public class KafkaTemplateTests {
 		Message<String> message1 = MessageBuilder.withPayload("foo-message")
 				.setHeader(KafkaHeaders.TOPIC, INT_KEY_TOPIC)
 				.setHeader(KafkaHeaders.PARTITION_ID, 0)
+				.setHeader("foo", "bar")
+				.setHeader(KafkaHeaders.RECEIVED_TOPIC, "dummy")
 				.build();
 
 		template.send(message1);
 
 		ConsumerRecord<Integer, String> r1 = KafkaTestUtils.getSingleRecord(consumer, INT_KEY_TOPIC);
 		assertThat(r1).has(value("foo-message"));
+		Iterator<Header> iterator = r1.headers().iterator();
+		assertThat(iterator.hasNext()).isTrue();
+		Header next = iterator.next();
+		assertThat(next.key()).isEqualTo("foo");
+		assertThat(new String(next.value())).isEqualTo("\"bar\"");
+		assertThat(iterator.hasNext()).isTrue();
+		next = iterator.next();
+		assertThat(next.key()).isEqualTo(DefaultKafkaHeaderMapper.JSON_TYPES);
+		assertThat(iterator.hasNext()).as("Expected no more headers").isFalse();
 
 		Message<String> message2 = MessageBuilder.withPayload("foo-message-2")
 				.setHeader(KafkaHeaders.TOPIC, INT_KEY_TOPIC)
 				.setHeader(KafkaHeaders.PARTITION_ID, 0)
 				.setHeader(KafkaHeaders.TIMESTAMP, 1487694048615L)
+				.setHeader("foo", "bar")
 				.build();
 
 		template.send(message2);
@@ -200,11 +217,14 @@ public class KafkaTemplateTests {
 
 		MessagingMessageConverter messageConverter = new MessagingMessageConverter();
 
-		Message<?> recordToMessage = messageConverter.toMessage(r2, null, String.class);
+		Acknowledgment ack = mock(Acknowledgment.class);
+		Message<?> recordToMessage = messageConverter.toMessage(r2, ack, String.class);
 
 		assertThat(recordToMessage.getHeaders().get(KafkaHeaders.TIMESTAMP_TYPE)).isEqualTo("CREATE_TIME");
 		assertThat(recordToMessage.getHeaders().get(KafkaHeaders.RECEIVED_TIMESTAMP)).isEqualTo(1487694048615L);
 		assertThat(recordToMessage.getHeaders().get(KafkaHeaders.RECEIVED_TOPIC)).isEqualTo(INT_KEY_TOPIC);
+		assertThat(recordToMessage.getHeaders().get(KafkaHeaders.ACKNOWLEDGMENT)).isSameAs(ack);
+		assertThat(recordToMessage.getHeaders().get("foo")).isEqualTo("bar");
 		assertThat(recordToMessage.getPayload()).isEqualTo("foo-message-2");
 
 		pf.destroy();
