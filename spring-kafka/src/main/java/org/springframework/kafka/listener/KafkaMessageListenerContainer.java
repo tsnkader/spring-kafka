@@ -36,6 +36,7 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.NoOffsetForPartitionException;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetCommitCallback;
 import org.apache.kafka.common.TopicPartition;
@@ -286,6 +287,8 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 
 		private long last;
 
+		private boolean fatalError;
+
 		@SuppressWarnings("unchecked")
 		ListenerConsumer(GenericMessageListener<?> listener, GenericAcknowledgingMessageListener<?> ackListener) {
 			Assert.state(!this.isAnyManualAck || !this.autoCommit,
@@ -370,7 +373,7 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 				public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
 					getContainerProperties().getConsumerRebalanceListener().onPartitionsRevoked(partitions);
 					// Wait until now to commit, in case the user listener added acks
-					commitManualAcks();
+					commitPendingAcks();
 				}
 
 				@Override
@@ -383,7 +386,14 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 						// see https://github.com/spring-projects/spring-kafka/issues/110
 						Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
 						for (TopicPartition partition : partitions) {
-							offsets.put(partition, new OffsetAndMetadata(consumer.position(partition)));
+							try {
+								offsets.put(partition, new OffsetAndMetadata(consumer.position(partition)));
+							}
+							catch (NoOffsetForPartitionException e) {
+								ListenerConsumer.this.fatalError = true;
+								ListenerConsumer.this.logger.error("No offset and no reset policy", e);
+								return;
+							}
 						}
 						if (ListenerConsumer.this.logger.isDebugEnabled()) {
 							ListenerConsumer.this.logger.debug("Committing on assignment: " + offsets);
@@ -509,6 +519,11 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 				catch (WakeupException e) {
 					// Ignore, we're stopping
 				}
+				catch (NoOffsetForPartitionException nofpe) {
+					this.fatalError = true;
+					ListenerConsumer.this.logger.error("No offset and no reset policy", nofpe);
+					break;
+				}
 				catch (Exception e) {
 					if (this.containerProperties.getGenericErrorHandler() != null) {
 						this.containerProperties.getGenericErrorHandler().handle(e, null);
@@ -518,12 +533,18 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 					}
 				}
 			}
-			commitManualAcks();
-			try {
-				this.consumer.unsubscribe();
+			if (!this.fatalError) {
+				commitPendingAcks();
+				try {
+					this.consumer.unsubscribe();
+				}
+				catch (WakeupException e) {
+					// No-op. Continue process
+				}
 			}
-			catch (WakeupException e) {
-				// No-op. Continue process
+			else {
+				ListenerConsumer.this.logger.error("No offset and no reset policy; stopping container");
+				KafkaMessageListenerContainer.this.stop();
 			}
 			this.consumer.close();
 			if (this.logger.isInfoEnabled()) {
@@ -531,7 +552,7 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 			}
 		}
 
-		private void commitManualAcks() {
+		private void commitPendingAcks() {
 			processCommits();
 			if (this.offsets.size() > 0) {
 				// we always commit after stopping the invoker
