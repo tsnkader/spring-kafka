@@ -106,7 +106,7 @@ public class KafkaMessageListenerContainerTests {
 	private static String topic17 = "testTopic17";
 
 	@ClassRule
-	public static KafkaEmbedded embeddedKafka = new KafkaEmbedded(1, true, topic3, topic4, topic5,
+	public static KafkaEmbedded embeddedKafka = new KafkaEmbedded(1, true, topic5,
 			topic6, topic7, topic8, topic9, topic10, topic11, topic12, topic13, topic14, topic15, topic16, topic17);
 
 	@Rule
