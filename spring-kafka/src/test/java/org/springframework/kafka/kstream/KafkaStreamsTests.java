@@ -76,7 +76,10 @@ import org.springframework.util.concurrent.SettableListenableFuture;
 		topics = {
 				KafkaStreamsTests.STREAMING_TOPIC1,
 				KafkaStreamsTests.STREAMING_TOPIC2,
-				KafkaStreamsTests.FOOS})
+				KafkaStreamsTests.FOOS },
+		brokerProperties = {
+				"auto.create.topics.enable=false",
+				"delete.topic.enable=true" })
 public class KafkaStreamsTests {
 
 	static final String STREAMING_TOPIC1 = "streamingTopic1";
@@ -99,6 +102,9 @@ public class KafkaStreamsTests {
 
 	@Test
 	public void testKStreams() throws Exception {
+		assertThat(this.kafkaEmbedded.getKafkaServer(0).config().autoCreateTopicsEnable()).isFalse();
+		assertThat(this.kafkaEmbedded.getKafkaServer(0).config().deleteTopicEnable()).isTrue();
+
 		this.kStreamBuilderFactoryBean.stop();
 
 		CountDownLatch stateLatch = new CountDownLatch(1);
