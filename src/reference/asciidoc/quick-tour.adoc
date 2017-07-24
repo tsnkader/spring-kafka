@@ -29,9 +29,7 @@ compile 'org.springframework.kafka:spring-kafka:{spring-kafka-version}'
 ===== Compatibility
 
 - Apache Kafka 0.10.2.1
-- Tested with Spring Framework version dependency is 4.3.9 but it is expected that the framework will work with earlier
-versions of Spring.
-- Annotation-based listeners require Spring Framework 4.1 or higher, however.
+- Spring Framework 4.3.x
 - Minimum Java version: 7.
 
 ===== Very, Very Quick
