@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.commons.logging.Log;
@@ -176,7 +177,9 @@ public class DefaultKafkaHeaderMapper implements KafkaHeaderMapper {
 	@Override
 	public void fromHeaders(MessageHeaders headers, Headers target) {
 		final Map<String, String> jsonHeaders = new HashMap<>();
-		headers.forEach((k, v) -> {
+		for (Entry<String, Object> entry : headers.entrySet()) {
+			String k = entry.getKey();
+			Object v = entry.getValue();
 			if (matches(k)) {
 				if (v instanceof byte[]) {
 					target.add(new RecordHeader(k, (byte[]) v));
@@ -193,7 +196,7 @@ public class DefaultKafkaHeaderMapper implements KafkaHeaderMapper {
 					}
 				}
 			}
-		});
+		}
 		if (jsonHeaders.size() > 0) {
 			try {
 				target.add(new RecordHeader(JSON_TYPES, this.objectMapper.writeValueAsBytes(jsonHeaders)));
@@ -234,7 +237,9 @@ public class DefaultKafkaHeaderMapper implements KafkaHeaderMapper {
 			}
 		}
 		final Map<String, String> jsonTypes = types;
-		source.forEach(h -> {
+		iterator = source.iterator();
+		while (iterator.hasNext()) {
+			Header h = iterator.next();
 			if (!(h.key().equals(JSON_TYPES))) {
 				if (jsonTypes != null && jsonTypes.containsKey(h.key())) {
 					Class<?> type = Object.class;
@@ -267,7 +272,7 @@ public class DefaultKafkaHeaderMapper implements KafkaHeaderMapper {
 					headers.put(h.key(), h.value());
 				}
 			}
-		});
+		}
 	}
 
 	private boolean trusted(String requestedType) {

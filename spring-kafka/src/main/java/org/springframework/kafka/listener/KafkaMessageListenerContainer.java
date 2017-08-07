@@ -417,7 +417,7 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 						// it protects us from the case when another consumer starts
 						// and rebalance would cause it to reset at the end
 						// see https://github.com/spring-projects/spring-kafka/issues/110
-						Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
+						final Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
 						for (TopicPartition partition : partitions) {
 							try {
 								offsets.put(partition, new OffsetAndMetadata(consumer.position(partition)));
