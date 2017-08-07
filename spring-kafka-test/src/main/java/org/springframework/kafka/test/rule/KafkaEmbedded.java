@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -175,7 +176,9 @@ public class KafkaEmbedded extends ExternalResource implements KafkaRule, Initia
 			brokerConfigProperties.setProperty("controller.socket.timeout.ms", "1000");
 			brokerConfigProperties.setProperty("offsets.topic.replication.factor", "1");
 			if (this.brokerProperties != null) {
-				this.brokerProperties.forEach(brokerConfigProperties::setProperty);
+				for (Entry<String, String> property : this.brokerProperties.entrySet()) {
+					brokerConfigProperties.setProperty(property.getKey(), property.getValue());
+				}
 			}
 			KafkaServer server = TestUtils.createServer(new KafkaConfig(brokerConfigProperties), Time.SYSTEM);
 			this.kafkaServers.add(server);
