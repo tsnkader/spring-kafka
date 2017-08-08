@@ -75,7 +75,6 @@ import scala.collection.Set;
  * @author Artem Bilan
  * @author Gary Russell
  */
-@SuppressWarnings("serial")
 public class KafkaEmbedded extends ExternalResource implements KafkaRule, InitializingBean, DisposableBean {
 
 	public static final String BEAN_NAME = "kafkaEmbedded";

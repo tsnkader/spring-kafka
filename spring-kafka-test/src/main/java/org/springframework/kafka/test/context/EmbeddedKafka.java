@@ -22,7 +22,6 @@ import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.Map;
 
 import org.springframework.core.annotation.AliasFor;
 import org.springframework.kafka.test.rule.KafkaEmbedded;
