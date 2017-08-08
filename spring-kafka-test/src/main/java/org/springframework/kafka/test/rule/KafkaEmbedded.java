@@ -18,6 +18,7 @@ package org.springframework.kafka.test.rule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.File;
 import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,6 +40,7 @@ import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.protocol.Errors;
+import org.apache.kafka.common.protocol.SecurityProtocol;
 import org.apache.kafka.common.requests.MetadataResponse;
 import org.apache.kafka.common.utils.Time;
 import org.junit.rules.ExternalResource;
@@ -167,10 +169,10 @@ public class KafkaEmbedded extends ExternalResource implements KafkaRule, Initia
 			ss.close();
 			Properties brokerConfigProperties = TestUtils.createBrokerConfig(i, this.zkConnect, this.controlledShutdown,
 					true, randomPort,
-					scala.Option.apply(null),
-					scala.Option.apply(null),
-					scala.Option.apply(null),
-					true, false, 0, false, 0, false, 0, scala.Option.apply(null));
+					scala.Option.<SecurityProtocol>apply(null),
+					scala.Option.<File>apply(null),
+					scala.Option.<Properties>apply(null),
+					true, false, 0, false, 0, false, 0, scala.Option.<String>apply(null));
 			brokerConfigProperties.setProperty(KafkaConfig$.MODULE$.PortProp(), "" + randomPort);
 			brokerConfigProperties.setProperty("replica.socket.timeout.ms", "1000");
 			brokerConfigProperties.setProperty("controller.socket.timeout.ms", "1000");
