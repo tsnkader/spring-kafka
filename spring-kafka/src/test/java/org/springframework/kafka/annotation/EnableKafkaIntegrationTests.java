@@ -96,6 +96,8 @@ import org.springframework.transaction.annotation.Transactional;
 @DirtiesContext
 public class EnableKafkaIntegrationTests {
 
+	private static final String DEFAULT_TEST_GROUP_ID = "testAnnot";
+
 	@Autowired
 	public Listener listener;
 
@@ -104,7 +106,7 @@ public class EnableKafkaIntegrationTests {
 			"annotated1", "annotated2", "annotated3",
 			"annotated4", "annotated5", "annotated6", "annotated7", "annotated8", "annotated9", "annotated10",
 			"annotated11", "annotated12", "annotated13", "annotated14", "annotated15", "annotated16", "annotated17",
-			"annotated18", "annotated19", "annotated20");
+			"annotated18", "annotated19", "annotated20", "annotated29");
 
 	@Autowired
 	public IfaceListenerImpl ifaceListener;
@@ -126,6 +128,15 @@ public class EnableKafkaIntegrationTests {
 
 	@Autowired
 	private List<?> quxGroup;
+
+	@Test
+	public void testAnonymous() {
+		MessageListenerContainer container = this.registry
+				.getListenerContainer("org.springframework.kafka.KafkaListenerEndpointContainer#0");
+		List<?> containers = KafkaTestUtils.getPropertyValue(container, "containers", List.class);
+		assertThat(KafkaTestUtils.getPropertyValue(containers.get(0), "listenerConsumer.consumerGroupId"))
+				.isEqualTo(DEFAULT_TEST_GROUP_ID);
+	}
 
 	@Test
 	public void testSimple() throws Exception {
@@ -168,6 +179,9 @@ public class EnableKafkaIntegrationTests {
 				.isInstanceOf(MessagingMessageListenerAdapter.class);
 		assertThat(this.quxGroup.size()).isEqualTo(1);
 		assertThat(this.quxGroup.get(0)).isSameAs(manualContainer);
+		List<?> containers = KafkaTestUtils.getPropertyValue(manualContainer, "containers", List.class);
+		assertThat(KafkaTestUtils.getPropertyValue(containers.get(0), "listenerConsumer.consumerGroupId"))
+			.isEqualTo("qux");
 
 		template.send("annotated5", 0, 0, "foo");
 		template.send("annotated5", 1, 0, "bar");
@@ -521,7 +535,7 @@ public class EnableKafkaIntegrationTests {
 
 		@Bean
 		public Map<String, Object> consumerConfigs() {
-			Map<String, Object> consumerProps = KafkaTestUtils.consumerProps("testAnnot", "false", embeddedKafka);
+			Map<String, Object> consumerProps = KafkaTestUtils.consumerProps(DEFAULT_TEST_GROUP_ID, "false", embeddedKafka);
 			consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 			return consumerProps;
 		}
@@ -783,6 +797,10 @@ public class EnableKafkaIntegrationTests {
 		@KafkaListener(id = "errorHandler", topics = "annotated20", errorHandler = "consumeException")
 		public String errorHandler(String data) throws Exception {
 			throw new Exception("return this");
+		}
+
+		@KafkaListener(topics = "annotated29")
+		public void anonymousListener(String in) {
 		}
 
 		@Override

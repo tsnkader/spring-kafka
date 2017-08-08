@@ -16,6 +16,8 @@
 
 package org.springframework.kafka.core;
 
+import java.util.Map;
+
 import org.apache.kafka.clients.consumer.Consumer;
 
 /**
@@ -59,5 +61,13 @@ public interface ConsumerFactory<K, V> {
 	 * @return true if auto commit.
 	 */
 	boolean isAutoCommit();
+
+	/**
+	 * Return an unmodifiable reference to the configuration map for this factory.
+	 * Useful for cloning to make a similar factory.
+	 * @return the configs.
+	 * @since 1.3
+	 */
+	Map<String, Object> getConfigurationProperties();
 
 }

@@ -66,6 +66,7 @@ public class DefaultKafkaConsumerFactory<K, V> implements ConsumerFactory<K, V>,
 		this.valueDeserializer = valueDeserializer;
 	}
 
+	@Override
 	public Map<String, Object> getConfigurationProperties() {
 		return Collections.unmodifiableMap(this.configs);
 	}
