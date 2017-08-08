@@ -47,7 +47,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * Headers in {@link KafkaHeaders} are never mapped on outbound messages.
  *
  * @author Gary Russell
- * @since 2.0
+ * @since 1.3
  *
  */
 public class DefaultKafkaHeaderMapper implements KafkaHeaderMapper {

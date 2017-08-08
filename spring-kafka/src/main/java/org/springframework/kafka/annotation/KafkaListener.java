@@ -155,7 +155,7 @@ public @interface KafkaListener {
 	 * Set an {@link org.springframework.kafka.listener.KafkaListenerErrorHandler} to
 	 * invoke if the listener method throws an exception.
 	 * @return the error handler.
-	 * @since 2.0
+	 * @since 1.3
 	 */
 	String errorHandler() default "";
 
@@ -163,7 +163,7 @@ public @interface KafkaListener {
 	 * Override the {@code group.id} property for the consumer factory with this value
 	 * for this listener only.
 	 * @return the group id.
-	 * @since 2.0
+	 * @since 1.3
 	 */
 	String groupId() default "";
 
@@ -172,7 +172,7 @@ public @interface KafkaListener {
 	 * provided) as the {@code group.id} property for the consumer. Set to false, to use
 	 * the {@code group.id} from the consumer factory.
 	 * @return false to disable.
-	 * @since 2.0
+	 * @since 1.3
 	 */
 	boolean idIsGroup() default true;
 
