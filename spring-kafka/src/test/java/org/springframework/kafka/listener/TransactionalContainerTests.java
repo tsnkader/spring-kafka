@@ -209,7 +209,7 @@ public class TransactionalContainerTests {
 		Consumer consumer = mock(Consumer.class);
 		final TopicPartition topicPartition = new TopicPartition("foo", 0);
 		willAnswer(i -> {
-			((ConsumerRebalanceListener) i.getArgument(1))
+			i.getArgumentAt(1, ConsumerRebalanceListener.class)
 					.onPartitionsAssigned(Collections.singletonList(topicPartition));
 			return null;
 		}).given(consumer).subscribe(any(Collection.class), any(ConsumerRebalanceListener.class));
