@@ -47,6 +47,7 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaResourceHolder;
+import org.springframework.kafka.core.ProducerFactoryUtils;
 import org.springframework.kafka.event.ListenerContainerIdleEvent;
 import org.springframework.kafka.listener.ConsumerSeekAware.ConsumerSeekCallback;
 import org.springframework.kafka.listener.config.ContainerProperties;
@@ -531,6 +532,9 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 			if (this.theListener instanceof ConsumerSeekAware) {
 				((ConsumerSeekAware) this.theListener).registerSeekCallback(this);
 			}
+			if (this.transactionManager != null) {
+				ProducerFactoryUtils.setConsumerGroupId(this.consumerGroupId);
+			}
 			this.count = 0;
 			this.last = System.currentTimeMillis();
 			if (isRunning() && this.definedPartitions != null) {
@@ -585,6 +589,7 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 					}
 				}
 			}
+			ProducerFactoryUtils.clearConsumerGroupId();
 			if (!this.fatalError) {
 				if (this.kafkaTxManager == null) {
 					commitPendingAcks();
@@ -895,7 +900,7 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 		}
 
 		@SuppressWarnings({ "unchecked", "rawtypes" })
-		protected void sendOffsetsToTransaction(Producer producer) {
+		private void sendOffsetsToTransaction(Producer producer) {
 			handleAcks();
 			Map<TopicPartition, OffsetAndMetadata> commits = buildCommits();
 			producer.sendOffsetsToTransaction(commits, this.consumerGroupId);
